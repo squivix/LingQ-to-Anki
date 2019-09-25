@@ -1,4 +1,4 @@
-# LingQs-pullup
+# LingQs To Anki
 A script that pulls up all LingQs from your LingQ account and adds them to Anki as flashcards.
 
 # Using
