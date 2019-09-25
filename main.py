@@ -1,5 +1,6 @@
 import ast
 import json
+from getpass import getpass
 
 import requests
 from requests import RequestException
@@ -78,12 +79,12 @@ def send_request(action, **params):
     except RequestException:
         print("Cannot connect to Ankiconnect.\nPlease make sure Anki is running and that the Ankiconnect extension is "
               "installed.")
-        input("Press any key to exit...")
+        input("\nPress enter to exit...")
         exit(1)
     if not action == 'version' and not json.loads(r.text)["error"] is None:
         print("ERROR:", json.loads(r.text)["error"])
         print("\nPlease fix the error above, make sure Anki is running and your preferred profile is selected.")
-        input("Press any key to exit...")
+        input("\nPress enter to exit...")
         exit(1)
     return r
 
@@ -128,7 +129,7 @@ def select_model():
     # and store the result as a list of strings
     models = json.loads(response.text)["result"]
     # Prompt the user to select a model and list all the models available
-    print("Select the model you would like all your LingQs to be added with")
+    print("Select the model you would like all your LingQs to be added with:")
     for num, model in enumerate(models, start=1):
         print(str(num) + "-", model)
     # Allow the user to select the model
@@ -140,7 +141,7 @@ def select_model():
 # Receives the username and password of the LingQ account,
 # longs into that account, and retrieves all the LingQs the user has
 # Returning them as a list of dictionaries
-def retrieve_lingqs(username, password):
+def retrieve_lingqs(username="testingtesting", password="testingtesting"):
     print("Connecting to LingQ...")
     # Get the API key for the account
     auth = requests.post("https://www.lingq.com/api/api-token-auth/",
@@ -186,15 +187,15 @@ def select_fields(model="Basic"):
     # Convert the response from a JSON string to a dictionary and get the result item
     # of that dictionary, which should be a list of all the fields stored in fields_available
     fields_available = json.loads(response.text)["result"]
-    # Make a list of AnkiField objects and initilize it with all the mFields member variables with
+    # Make a list of AnkiField objects and initialize it with all the mFields member variables with
     # items from fields_available
     fields = []
     for i in range(len(fields_available)):
         fields.append(AnkiField(fields_available[i], ""))
     lingq_attributes_available = LINGQ_ATTRIBUTES[:]
 
-    print("Please select which fields in the model \"" + model +
-          "\" to correspond with which LingQ attribute\n")
+    print("\nPlease select which fields in the model \"" + model +
+          "\" to correspond with which LingQ attribute.")
     while len(fields_available) > 0:
         for num, field in enumerate(fields_available, start=1):
             print(str(num) + "-", field)
@@ -213,6 +214,7 @@ def select_fields(model="Basic"):
                     fields[num].mCorrespondingLingqAttribute = lingq_attributes_available[lingq_attribute - 2]
             lingq_attributes_available.pop(lingq_attribute - 2)
         fields_available.pop(field - 1)
+        print()
     return fields
 
 
@@ -232,23 +234,29 @@ def add_notes(deck, fields, lingqs):
                 fields_dict[f.mField] = ""
             else:
                 fields_dict[f.mField] = lingq[f.mCorrespondingLingqAttribute]
-        send_request("addNote", note={"deckName": deck,
-                                      "modelName": model,
-                                      "fields": fields_dict,
-                                      "options": {"allowDuplicate": True},
-                                      "tags": []})
-        print("Added note:", lingq[fields[0].mCorrespondingLingqAttribute])
-    print("Done adding", len(lingqs), "notes to", deck, ".")
+        response = json.loads(send_request("addNote", note={"deckName": deck,
+                                                            "modelName": model,
+                                                            "fields": fields_dict,
+                                                            "options": {"allowDuplicate": True},
+                                                            "tags": []}).text)
+        if response["error"] is None:
+            print(
+                "Added LingQ \"" + lingq['term'] + "\"" + (("{:>" + str(45 - len(lingq["term"]) + 3) + "}").format(
+                    " as a note with the ID:" + str(response["result"]))))
+        else:
+            print("Error adding LingQ \"" + lingq['term'] + "\"")
+            print(json.loads(response.text)["error"])
+    print("Done adding", len(lingqs), " LingQs as notes to", deck, ".")
 
 
 LINGQ_ATTRIBUTES = ['term', 'hints', 'fragment', 'notes', 'tags']
 while True:
     username = input("Enter your LingQ username:\t")
-    password = input("Enter your LingQ password:\t")
+    password = getpass("Enter your LingQ password:\t")
     lingqs = retrieve_lingqs(username, password)
     if not lingqs == 1:
         break
-    print("Please try logging in again\n")
+    print("Please try logging in again.\n")
 
 version = int(send_request("version").text)
 print("Connected to Ankiconnect version", version)
@@ -256,4 +264,4 @@ deck = select_deck()
 model = select_model()
 fields = select_fields(model)
 add_notes(deck, fields, lingqs)
-input("\nPress any key to exit...")
+input("\nPress enter to exit...")
