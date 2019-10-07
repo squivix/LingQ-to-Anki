@@ -81,7 +81,9 @@ def send_request(action, **params):
               "installed.")
         input("\nPress enter to exit...")
         exit(1)
-    if not action == 'version' and not json.loads(r.text)["error"] is None:
+    if not action == 'version' \
+            and not json.loads(r.text)["error"] is None \
+            and not json.loads(r.text)["error"] == 'cannot create note because it is a duplicate':
         print("ERROR:", json.loads(r.text)["error"])
         print("\nPlease fix the error above, make sure Anki is running and your preferred profile is selected.")
         input("\nPress enter to exit...")
@@ -221,9 +223,11 @@ def select_fields(model="Basic"):
 def add_notes(deck, fields, lingqs):
     print("Adding notes.\nThis may take a very long time.\nPlease be patient...")
     fields_dict = {}
+    lingqs_added = len(lingqs)
     for lingq in lingqs:
         # Skip LingQs that are known
         if lingq["status"] == 3:
+            lingqs_added -= 1
             continue
         for f in fields:
             if f.mCorrespondingLingqAttribute == LINGQ_ATTRIBUTES[1]:
@@ -237,16 +241,16 @@ def add_notes(deck, fields, lingqs):
         response = json.loads(send_request("addNote", note={"deckName": deck,
                                                             "modelName": model,
                                                             "fields": fields_dict,
-                                                            "options": {"allowDuplicate": True},
+                                                            "options": {"allowDuplicate": False},
                                                             "tags": []}).text)
         if response["error"] is None:
             print(
                 "Added LingQ \"" + lingq['term'] + "\"" + (("{:>" + str(45 - len(lingq["term"]) + 3) + "}").format(
                     " as a note with the ID:" + str(response["result"]))))
         else:
-            print("Error adding LingQ \"" + lingq['term'] + "\"")
-            print(json.loads(response.text)["error"])
-    print("Done adding", len(lingqs), " LingQs as notes to", deck, ".")
+            print("Error adding LingQ \"" + lingq['term'] + "\":", response["error"])
+            lingqs_added -= 1
+    print("Done adding", lingqs_added, " LingQs as notes to", deck, ".")
 
 
 LINGQ_ATTRIBUTES = ['term', 'hints', 'fragment', 'notes', 'tags']
